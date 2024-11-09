@@ -8,6 +8,9 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
+# 크롤링 제한 시작 시간을 상수로 선언
+START_TIME = datetime.datetime(2024, 11, 9, 12, 30)  # 연도, 월, 일, 시, 분
+LIMIT_TIME = datetime.timedelta(minutes=720)
 
 class CrawlerThread(QtCore.QThread):
     update_status = QtCore.pyqtSignal(str)
@@ -69,8 +72,8 @@ class CrawlerUI(QtWidgets.QWidget):
         self.initUI()
         self.crawler_thread = None
 
-        # 제한 시작 시간을 명확한 시간 지점으로 설정 (예: 2023년 11월 1일, 오후 2시 30분)
-        self.start_time = datetime.datetime(2024, 11, 9, 12, 5)
+        # 제한 시작 시간을 상수 START_TIME으로 설정
+        self.start_time = START_TIME
         self.sample_time_limit = datetime.timedelta(minutes=1)  # 제한 시간 설정 (예: 1분)
 
     def initUI(self):
@@ -123,6 +126,10 @@ class CrawlerUI(QtWidgets.QWidget):
         if not self.check_time_limit():
             return
 
+        # 크롤링 시작 시, 저장 버튼 색상을 라이트 레드로 변경하고 텍스트 변경
+        self.save_button.setStyleSheet("background-color: lightcoral;")
+        self.save_button.setText("메모장 저장 준비 중")
+
         url = self.url_input.text()
         if not url:
             self.display_error("URL이 입력되지 않았습니다.")
@@ -138,9 +145,10 @@ class CrawlerUI(QtWidgets.QWidget):
         self.crawler_thread.start()
 
     def enable_save_button(self):
-        # 버튼 활성화 및 색상 변경
+        # 크롤링 완료 후, 저장 버튼 색상을 라이트 그린으로 변경하고 텍스트 변경
         self.save_button.setEnabled(True)
         self.save_button.setStyleSheet("background-color: lightgreen;")
+        self.save_button.setText("메모장으로 결과물 저장")
 
     def save_results_to_file(self):
         # 파일 저장 창 열기
