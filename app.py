@@ -27,8 +27,16 @@ class CrawlerThread(QtCore.QThread):
             self.update_status.emit("페이지 로딩 완료, 크롤링 시작 중...")
             driver.get(self.url)
 
-            titles = driver.find_elements(By.XPATH, "//span[@class='title']")[:10]
-            
+            # 먼저 span.title 요소 찾기 시도
+            try:
+                titles = driver.find_elements(By.XPATH, "//span[@class='title']")[:10]
+                if not titles:  # 비어 있을 경우 강제로 예외 발생
+                    raise NoSuchElementException("span.title 요소를 찾을 수 없습니다.")
+            except NoSuchElementException:
+                # span.title이 없는 경우 strong.title 요소를 찾도록 함
+                self.update_status.emit("span.title 요소를 찾을 수 없어 strong.title로 대체합니다.")
+                titles = driver.find_elements(By.XPATH, "//strong[@class='title']")[:10]
+
             for i, title in enumerate(titles):
                 title_text = title.text
                 self.results.append(title_text)
