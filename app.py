@@ -7,11 +7,10 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
-
 class CrawlerThread(QtCore.QThread):
     update_status = QtCore.pyqtSignal(str)
     update_result = QtCore.pyqtSignal(str)
-    error_occurred = QtCore.pyqtSignal(str, str)  # Exception 타입을 str로 변경
+    error_occurred = QtCore.pyqtSignal(str, str)
 
     def __init__(self, url):
         super().__init__()
@@ -28,21 +27,24 @@ class CrawlerThread(QtCore.QThread):
             self.update_status.emit("페이지 로딩 완료, 크롤링 시작 중...")
             driver.get(self.url)
 
-            posts = driver.find_elements(By.CSS_SELECTOR, "h2.post-title")[:3]
-            dates = driver.find_elements(By.CSS_SELECTOR, "span.post-date")[:3]
+            titles = driver.find_elements(By.XPATH, "//span[@class='title']")[:10]
+            
+            for i, title in enumerate(titles):
+                title_text = title.text
+                self.results.append(title_text)
+                self.update_result.emit(f"제목 {i + 1}: {title_text}\n")
+                self.update_status.emit(f"{i + 1}번째 제목 크롤링 완료")
 
-            for i in range(3):
-                post_title = posts[i].text
-                post_date = dates[i].text
-                self.results.append({"title": post_title, "date": post_date})
-                self.update_result.emit(f"제목: {post_title}\n생성일자: {post_date}\n\n")
-                self.update_status.emit(f"{i + 1}번째 게시글 크롤링 완료")
+            # 파일에 저장
+            with open("crawled_titles.txt", "w", encoding="utf-8") as f:
+                for title in self.results:
+                    f.write(f"{title}\n")
+            self.update_status.emit("크롤링 완료! 파일에 저장되었습니다.")
 
             driver.quit()
-            self.update_status.emit("크롤링 완료!")
 
         except NoSuchElementException as e:
-            error_trace = traceback.format_exc()  # 전체 트레이스백을 문자열로 반환
+            error_trace = traceback.format_exc()
             self.error_occurred.emit("크롤링 요소를 찾을 수 없습니다.", error_trace)
         except WebDriverException as e:
             error_trace = traceback.format_exc()
@@ -102,6 +104,7 @@ class CrawlerUI(QtWidgets.QWidget):
 
     def display_error(self, message, error_trace=""):
         self.log_status("오류 발생!")
+        self.log_status("\n")
         self.result_text.append("\n오류 메시지:")
         self.result_text.setTextColor(QtGui.QColor("red"))
         error_message = f"{message}\n\n세부 정보:\n{error_trace}"
