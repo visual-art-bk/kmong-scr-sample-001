@@ -79,7 +79,7 @@ class CrawlerUI(QtWidgets.QWidget):
         self.sample_time_limit = LIMIT_TIME  # 제한 시간 설정
 
         # 타이머 연결
-        self.animation_timer.timeout.connect(self.animate_save_button)
+        self.animation_timer.timeout.connect(self.animate_buttons)
 
     def initUI(self):
         self.setWindowTitle("Tistory Blog Crawler")
@@ -131,10 +131,13 @@ class CrawlerUI(QtWidgets.QWidget):
         if not self.check_time_limit():
             return
 
-        # 크롤링 시작 시, 저장 버튼 UI 업데이트 및 애니메이션 시작
+        # 크롤링 시작 시, 저장 버튼과 시작 버튼 UI 업데이트 및 애니메이션 시작
         self.save_button.setStyleSheet("background-color: lightcoral; color: white;")
+        self.save_button.setEnabled(False)
         self.animation_index = 0
         self.animation_timer.start(500)  # 500ms마다 애니메이션 효과
+        self.start_button.setText("크롤링 중")
+        self.start_button.setEnabled(False)
 
         url = self.url_input.text()
         if not url:
@@ -150,18 +153,21 @@ class CrawlerUI(QtWidgets.QWidget):
         self.crawler_thread.finished.connect(self.enable_save_button)
         self.crawler_thread.start()
 
-    def animate_save_button(self):
+    def animate_buttons(self):
         """애니메이션 효과 적용"""
-        animation_text = "메모장 저장 준비 중" + "." * (self.animation_index % 4)
-        self.save_button.setText(animation_text)
+        dots = "." * (self.animation_index % 4)
+        self.save_button.setText(f"메모장 저장 준비 중{dots}")
+        self.start_button.setText(f"크롤링 중{dots}")
         self.animation_index += 1
 
     def enable_save_button(self):
-        # 크롤링 완료 후, 저장 버튼 UI 업데이트 및 애니메이션 정지
+        # 크롤링 완료 후, 저장 버튼과 시작 버튼 UI 업데이트 및 애니메이션 정지
         self.animation_timer.stop()
         self.save_button.setEnabled(True)
         self.save_button.setStyleSheet("background-color: lightgreen; color: black;")
         self.save_button.setText("메모장으로 결과물 저장")
+        self.start_button.setText("크롤링 시작")
+        self.start_button.setEnabled(True)
 
     def save_results_to_file(self):
         # 파일 저장 창 열기
