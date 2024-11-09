@@ -28,6 +28,7 @@ class CrawlerThread(QtCore.QThread):
             service = Service(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
             options.add_argument("--no-sandbox")
+            options.add_argument("start-maximized")  # 브라우저를 최대화로 열기
             driver = webdriver.Chrome(service=service, options=options)
 
             self.update_status.emit("페이지 로딩 완료, 크롤링 시작 중...")
@@ -76,6 +77,9 @@ class CrawlerUI(QtWidgets.QWidget):
 
         # 타이머 연결
         self.animation_timer.timeout.connect(self.animate_buttons)
+
+        # 최상단에 창을 고정
+        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
 
     def initUI(self):
         self.setWindowTitle("Tistory Blog Crawler")
