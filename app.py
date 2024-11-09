@@ -1,6 +1,6 @@
 import sys
 import traceback
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtWidgets, QtGui, QtCore
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -8,12 +8,55 @@ from selenium.common.exceptions import NoSuchElementException, WebDriverExceptio
 from webdriver_manager.chrome import ChromeDriverManager
 
 
+class CrawlerThread(QtCore.QThread):
+    update_status = QtCore.pyqtSignal(str)
+    update_result = QtCore.pyqtSignal(str)
+    error_occurred = QtCore.pyqtSignal(str, str)  # Exception 타입을 str로 변경
+
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self.results = []
+
+    def run(self):
+        try:
+            service = Service(ChromeDriverManager().install())
+            options = webdriver.ChromeOptions()
+            options.add_argument("--no-sandbox")
+            driver = webdriver.Chrome(service=service, options=options)
+
+            self.update_status.emit("페이지 로딩 완료, 크롤링 시작 중...")
+            driver.get(self.url)
+
+            posts = driver.find_elements(By.CSS_SELECTOR, "h2.post-title")[:3]
+            dates = driver.find_elements(By.CSS_SELECTOR, "span.post-date")[:3]
+
+            for i in range(3):
+                post_title = posts[i].text
+                post_date = dates[i].text
+                self.results.append({"title": post_title, "date": post_date})
+                self.update_result.emit(f"제목: {post_title}\n생성일자: {post_date}\n\n")
+                self.update_status.emit(f"{i + 1}번째 게시글 크롤링 완료")
+
+            driver.quit()
+            self.update_status.emit("크롤링 완료!")
+
+        except NoSuchElementException as e:
+            error_trace = traceback.format_exc()  # 전체 트레이스백을 문자열로 반환
+            self.error_occurred.emit("크롤링 요소를 찾을 수 없습니다.", error_trace)
+        except WebDriverException as e:
+            error_trace = traceback.format_exc()
+            self.error_occurred.emit("웹 드라이버 오류 발생.", error_trace)
+        except Exception as e:
+            error_trace = traceback.format_exc()
+            self.error_occurred.emit("알 수 없는 오류 발생.", error_trace)
+
+
 class CrawlerUI(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.results = []
-        self.error_occurred = False
+        self.crawler_thread = None
 
     def initUI(self):
         self.setWindowTitle("Tistory Blog Crawler")
@@ -50,43 +93,19 @@ class CrawlerUI(QtWidgets.QWidget):
             return
         self.log_status(f"크롤링 시작합니다 - {url}")
 
-        try:
-            service = Service(ChromeDriverManager().install())
-            options = webdriver.ChromeOptions()
-            options.add_argument("--no-sandbox")
-            driver = webdriver.Chrome(service=service, options=options)
+        # 스레드 시작
+        self.crawler_thread = CrawlerThread(url)
+        self.crawler_thread.update_status.connect(self.log_status)
+        self.crawler_thread.update_result.connect(self.result_text.append)
+        self.crawler_thread.error_occurred.connect(self.display_error)
+        self.crawler_thread.start()
 
-            driver.get(url)
-            self.log_status("페이지 로딩 완료, 크롤링 시작 중...")
-
-            posts = driver.find_elements(By.CSS_SELECTOR, "h2.post-title")[:3]
-            dates = driver.find_elements(By.CSS_SELECTOR, "span.post-date")[:3]
-
-            for i in range(3):
-                post_title = posts[i].text
-                post_date = dates[i].text
-                self.results.append({"title": post_title, "date": post_date})
-                self.result_text.append(
-                    f"제목: {post_title}\n생성일자: {post_date}\n\n"
-                )
-                self.log_status(f"{i+1}번째 게시글 크롤링 완료")
-
-            driver.quit()
-            self.log_status("크롤링 완료!")
-
-        except NoSuchElementException as e:
-            self.display_error("크롤링 요소를 찾을 수 없습니다.", e)
-        except WebDriverException as e:
-            self.display_error("웹 드라이버 오류 발생.", e)
-        except Exception as e:
-            self.display_error("알 수 없는 오류 발생.", e)
-
-    def display_error(self, message, exception):
-        self.error_occurred = True
+    def display_error(self, message, error_trace=""):
         self.log_status("오류 발생!")
         self.result_text.append("\n오류 메시지:")
         self.result_text.setTextColor(QtGui.QColor("red"))
-        self.result_text.append(f"{message}\n\n세부 정보:\n{traceback.format_exc()}")
+        error_message = f"{message}\n\n세부 정보:\n{error_trace}"
+        self.result_text.append(error_message)
         self.result_text.setTextColor(QtGui.QColor("black"))
 
 
