@@ -11,6 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # 크롤링 제한 시작 시간을 상수로 선언
 START_TIME = datetime.datetime(2024, 11, 9, 12, 30)  # 연도, 월, 일, 시, 분
 LIMIT_TIME = datetime.timedelta(minutes=720)
+MAX_TITLES = 5  # 수집할 타이틀 최대 개수
 
 class CrawlerThread(QtCore.QThread):
     update_status = QtCore.pyqtSignal(str)
@@ -32,17 +33,14 @@ class CrawlerThread(QtCore.QThread):
             self.update_status.emit("페이지 로딩 완료, 크롤링 시작 중...")
             driver.get(self.url)
 
-            # 먼저 span.title 요소 찾기 시도
+            # span.title 요소 찾기 시도
             try:
-                titles = driver.find_elements(By.XPATH, "//span[@class='title']")[:10]
-                if not titles:  # 비어 있을 경우 강제로 예외 발생
+                titles = driver.find_elements(By.XPATH, "//span[@class='title']")[:MAX_TITLES]
+                if not titles:
                     raise NoSuchElementException("span.title 요소를 찾을 수 없습니다.")
             except NoSuchElementException:
-                # span.title이 없는 경우 strong.title 요소를 찾도록 함
-                self.update_status.emit(
-                    "span.title 요소를 찾을 수 없어 strong.title로 대체합니다."
-                )
-                titles = driver.find_elements(By.XPATH, "//strong[@class='title']")[:10]
+                self.update_status.emit("span.title 요소를 찾을 수 없어 strong.title로 대체합니다.")
+                titles = driver.find_elements(By.XPATH, "//strong[@class='title']")[:MAX_TITLES]
 
             for i, title in enumerate(titles):
                 title_text = title.text
@@ -50,9 +48,7 @@ class CrawlerThread(QtCore.QThread):
                 self.update_result.emit(f"제목 {i + 1}: {title_text}\n")
                 self.update_status.emit(f"{i + 1}번째 게시글 크롤링 완료")
 
-            self.update_status.emit(
-                "크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다."
-            )
+            self.update_status.emit("크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다.")
             driver.quit()
 
         except NoSuchElementException as e:
