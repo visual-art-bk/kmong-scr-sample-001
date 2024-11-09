@@ -104,7 +104,9 @@ class CrawlerUI(QtWidgets.QWidget):
         self.crawler_thread.start()
 
     def enable_save_button(self):
+        # 버튼 활성화 및 색상 변경
         self.save_button.setEnabled(True)
+        self.save_button.setStyleSheet("background-color: lightgreen;")
 
     def save_results_to_file(self):
         # 파일 저장 창 열기
