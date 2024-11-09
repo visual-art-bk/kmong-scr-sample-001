@@ -48,7 +48,7 @@ class CrawlerThread(QtCore.QThread):
                 title_text = title.text
                 self.results.append(title_text)
                 self.update_result.emit(f"제목 {i + 1}: {title_text}\n")
-                self.update_status.emit(f"{i + 1}번째 제목 크롤링 완료")
+                self.update_status.emit(f"{i + 1}번째 게시글 크롤링 완료")
 
             self.update_status.emit(
                 "크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다."
@@ -71,10 +71,15 @@ class CrawlerUI(QtWidgets.QWidget):
         super().__init__()
         self.initUI()
         self.crawler_thread = None
+        self.animation_index = 0  # 애니메이션 인덱스
+        self.animation_timer = QtCore.QTimer()  # 애니메이션용 타이머
 
         # 제한 시작 시간을 상수 START_TIME으로 설정
         self.start_time = START_TIME
-        self.sample_time_limit = datetime.timedelta(minutes=1)  # 제한 시간 설정 (예: 1분)
+        self.sample_time_limit = LIMIT_TIME  # 제한 시간 설정
+
+        # 타이머 연결
+        self.animation_timer.timeout.connect(self.animate_save_button)
 
     def initUI(self):
         self.setWindowTitle("Tistory Blog Crawler")
@@ -126,9 +131,10 @@ class CrawlerUI(QtWidgets.QWidget):
         if not self.check_time_limit():
             return
 
-        # 크롤링 시작 시, 저장 버튼 색상을 라이트 레드로 변경하고 텍스트 변경
-        self.save_button.setStyleSheet("background-color: lightcoral;")
-        self.save_button.setText("메모장 저장 준비 중")
+        # 크롤링 시작 시, 저장 버튼 UI 업데이트 및 애니메이션 시작
+        self.save_button.setStyleSheet("background-color: lightcoral; color: white;")
+        self.animation_index = 0
+        self.animation_timer.start(500)  # 500ms마다 애니메이션 효과
 
         url = self.url_input.text()
         if not url:
@@ -144,10 +150,17 @@ class CrawlerUI(QtWidgets.QWidget):
         self.crawler_thread.finished.connect(self.enable_save_button)
         self.crawler_thread.start()
 
+    def animate_save_button(self):
+        """애니메이션 효과 적용"""
+        animation_text = "메모장 저장 준비 중" + "." * (self.animation_index % 4)
+        self.save_button.setText(animation_text)
+        self.animation_index += 1
+
     def enable_save_button(self):
-        # 크롤링 완료 후, 저장 버튼 색상을 라이트 그린으로 변경하고 텍스트 변경
+        # 크롤링 완료 후, 저장 버튼 UI 업데이트 및 애니메이션 정지
+        self.animation_timer.stop()
         self.save_button.setEnabled(True)
-        self.save_button.setStyleSheet("background-color: lightgreen;")
+        self.save_button.setStyleSheet("background-color: lightgreen; color: black;")
         self.save_button.setText("메모장으로 결과물 저장")
 
     def save_results_to_file(self):
