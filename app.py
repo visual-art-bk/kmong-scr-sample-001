@@ -35,12 +35,7 @@ class CrawlerThread(QtCore.QThread):
                 self.update_result.emit(f"제목 {i + 1}: {title_text}\n")
                 self.update_status.emit(f"{i + 1}번째 제목 크롤링 완료")
 
-            # 파일에 저장
-            with open("crawled_titles.txt", "w", encoding="utf-8") as f:
-                for title in self.results:
-                    f.write(f"{title}\n")
-            self.update_status.emit("크롤링 완료! 파일에 저장되었습니다.")
-
+            self.update_status.emit("크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다.")
             driver.quit()
 
         except NoSuchElementException as e:
@@ -52,7 +47,6 @@ class CrawlerThread(QtCore.QThread):
         except Exception as e:
             error_trace = traceback.format_exc()
             self.error_occurred.emit("알 수 없는 오류 발생.", error_trace)
-
 
 class CrawlerUI(QtWidgets.QWidget):
     def __init__(self):
@@ -79,6 +73,12 @@ class CrawlerUI(QtWidgets.QWidget):
         self.start_button.clicked.connect(self.start_crawling)
         layout.addWidget(self.start_button)
 
+        # 결과물 저장 버튼
+        self.save_button = QtWidgets.QPushButton("메모장으로 결과물 저장")
+        self.save_button.setEnabled(False)  # 초기에는 비활성화
+        self.save_button.clicked.connect(self.save_results_to_file)
+        layout.addWidget(self.save_button)
+
         self.result_text = QtWidgets.QTextEdit()
         self.result_text.setReadOnly(True)
         layout.addWidget(self.result_text)
@@ -100,24 +100,37 @@ class CrawlerUI(QtWidgets.QWidget):
         self.crawler_thread.update_status.connect(self.log_status)
         self.crawler_thread.update_result.connect(self.result_text.append)
         self.crawler_thread.error_occurred.connect(self.display_error)
+        self.crawler_thread.finished.connect(self.enable_save_button)
         self.crawler_thread.start()
+
+    def enable_save_button(self):
+        self.save_button.setEnabled(True)
+
+    def save_results_to_file(self):
+        # 파일 저장 창 열기
+        options = QtWidgets.QFileDialog.Options()
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "메모장으로 결과물 저장", "", "Text Files (*.txt);;All Files (*)", options=options)
+        
+        if file_path:
+            # 결과를 파일에 저장
+            with open(file_path, "w", encoding="utf-8") as f:
+                for title in self.crawler_thread.results:
+                    f.write(f"{title}\n")
+            self.log_status(f"결과물이 {file_path}에 저장되었습니다.")
 
     def display_error(self, message, error_trace=""):
         self.log_status("오류 발생!")
-        self.log_status("\n")
         self.result_text.append("\n오류 메시지:")
         self.result_text.setTextColor(QtGui.QColor("red"))
         error_message = f"{message}\n\n세부 정보:\n{error_trace}"
         self.result_text.append(error_message)
         self.result_text.setTextColor(QtGui.QColor("black"))
 
-
 def main():
     app = QtWidgets.QApplication(sys.argv)
     ex = CrawlerUI()
     ex.show()
     sys.exit(app.exec_())
-
 
 if __name__ == "__main__":
     main()
