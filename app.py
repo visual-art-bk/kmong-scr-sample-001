@@ -1,11 +1,13 @@
 import sys
 import traceback
+import datetime
 from PyQt5 import QtWidgets, QtGui, QtCore
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
+
 
 class CrawlerThread(QtCore.QThread):
     update_status = QtCore.pyqtSignal(str)
@@ -34,7 +36,9 @@ class CrawlerThread(QtCore.QThread):
                     raise NoSuchElementException("span.title 요소를 찾을 수 없습니다.")
             except NoSuchElementException:
                 # span.title이 없는 경우 strong.title 요소를 찾도록 함
-                self.update_status.emit("span.title 요소를 찾을 수 없어 strong.title로 대체합니다.")
+                self.update_status.emit(
+                    "span.title 요소를 찾을 수 없어 strong.title로 대체합니다."
+                )
                 titles = driver.find_elements(By.XPATH, "//strong[@class='title']")[:10]
 
             for i, title in enumerate(titles):
@@ -43,7 +47,9 @@ class CrawlerThread(QtCore.QThread):
                 self.update_result.emit(f"제목 {i + 1}: {title_text}\n")
                 self.update_status.emit(f"{i + 1}번째 제목 크롤링 완료")
 
-            self.update_status.emit("크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다.")
+            self.update_status.emit(
+                "크롤링 완료! 저장 버튼을 사용하여 파일에 저장할 수 있습니다."
+            )
             driver.quit()
 
         except NoSuchElementException as e:
@@ -56,11 +62,16 @@ class CrawlerThread(QtCore.QThread):
             error_trace = traceback.format_exc()
             self.error_occurred.emit("알 수 없는 오류 발생.", error_trace)
 
+
 class CrawlerUI(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
         self.crawler_thread = None
+
+        # 제한 시작 시간을 명확한 시간 지점으로 설정 (예: 2023년 11월 1일, 오후 2시 30분)
+        self.start_time = datetime.datetime(2024, 11, 9, 12, 5)
+        self.sample_time_limit = datetime.timedelta(minutes=1)  # 제한 시간 설정 (예: 1분)
 
     def initUI(self):
         self.setWindowTitle("Tistory Blog Crawler")
@@ -96,7 +107,22 @@ class CrawlerUI(QtWidgets.QWidget):
     def log_status(self, message):
         self.status_label.append(message)
 
+    def check_time_limit(self):
+        """설정된 시간이 지났는지 확인하고, 지났다면 알림을 띄우고 버튼을 비활성화"""
+        current_time = datetime.datetime.now()
+        if current_time - self.start_time > self.sample_time_limit:
+            QtWidgets.QMessageBox.warning(
+                self, "사용 시간 종료", "샘플 사용 시간이 끝났어요."
+            )
+            self.start_button.setEnabled(False)  # 시작 버튼 비활성화
+            return False
+        return True
+
     def start_crawling(self):
+        # 시간 제한 확인
+        if not self.check_time_limit():
+            return
+
         url = self.url_input.text()
         if not url:
             self.display_error("URL이 입력되지 않았습니다.")
@@ -119,8 +145,14 @@ class CrawlerUI(QtWidgets.QWidget):
     def save_results_to_file(self):
         # 파일 저장 창 열기
         options = QtWidgets.QFileDialog.Options()
-        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "메모장으로 결과물 저장", "", "Text Files (*.txt);;All Files (*)", options=options)
-        
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "메모장으로 결과물 저장",
+            "",
+            "Text Files (*.txt);;All Files (*)",
+            options=options,
+        )
+
         if file_path:
             # 결과를 파일에 저장
             with open(file_path, "w", encoding="utf-8") as f:
@@ -136,11 +168,13 @@ class CrawlerUI(QtWidgets.QWidget):
         self.result_text.append(error_message)
         self.result_text.setTextColor(QtGui.QColor("black"))
 
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     ex = CrawlerUI()
     ex.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
