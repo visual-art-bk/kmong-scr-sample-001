@@ -1,0 +1,4 @@
+PyQt5==5.15.11
+selenium==4.26.1
+webdriver_manager==4.0.2
+pyinstaller==6.11.1
